@@ -1,0 +1,5 @@
+baby-food-inventory/
+├── index.html
+├── package.json
+└── src/
+    └── App.jsx
