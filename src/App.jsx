@@ -24,7 +24,7 @@ const today = () => new Date().toISOString().split("T")[0];
 export default function App() {
   const [items, setItems] = useState(() => {
     try {
-      const saved = sessionStorage.getItem("baby_cubes");
+      const saved = localStorage.getItem("baby_cubes");
       return saved ? JSON.parse(saved) : DEFAULT_ITEMS;
     } catch { return DEFAULT_ITEMS; }
   });
@@ -35,7 +35,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("inventory");
 
   useEffect(() => {
-    try { sessionStorage.setItem("baby_cubes", JSON.stringify(items)); } catch {}
+    try { localStorage.setItem("baby_cubes", JSON.stringify(items)); } catch {}
   }, [items]);
 
   const openAdd = () => {
