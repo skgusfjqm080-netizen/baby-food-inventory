@@ -31,6 +31,31 @@ const isExpiringSoon = (dateStr) => {
 
 // ── localStorage 헬퍼 ─────────────────────────────────
 function useLocalStorage(key, init) {
+  const [val, setVal] = useState(null);
+
+  // 최초 로딩
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setVal(JSON.parse(saved));
+      } else {
+        setVal(init);
+      }
+    } catch {
+      setVal(init);
+    }
+  }, [key]);
+
+  // 변경될 때만 저장
+  useEffect(() => {
+    if (val !== null) {
+      localStorage.setItem(key, JSON.stringify(val));
+    }
+  }, [key, val]);
+
+  return [val, setVal];
+}
   const [val, setVal] = useState(() => {
     try {
       const s = localStorage.getItem(key);
