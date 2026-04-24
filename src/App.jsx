@@ -84,6 +84,7 @@ const BabyIllust = ({ size=56 }) => (
 );
 
 // ══════════════════════════════════════════════════════
+
 export default function App() {
   // ── 프로필 ─────────────────────────────────────────
   const [babyName,  setBabyName]  = useLS("baby_name_v1", "");
@@ -530,8 +531,8 @@ export default function App() {
 
       {/* ── 프로필 모달 ── */}
       {showProfileModal&&(
-        <div style={overlay}>
-          <div style={{...modal,maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={overlayStyle}>
+          <div style={{...modalStyle, maxHeight:"65vh"}}>
             <div style={mHandle}/>
             <div style={{fontSize:17,fontWeight:800,color:P.text,marginBottom:4}}>아기 프로필 설정</div>
             <div style={{fontSize:12,color:P.textSub,marginBottom:18}}>사진과 이름을 설정하면 헤더에 표시돼요</div>
@@ -564,8 +565,8 @@ export default function App() {
 
       {/* ── 끼니 모달 ── */}
       {showMealModal&&(
-        <div style={overlay} onClick={()=>setShowMealModal(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{...modal,maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={overlayStyle} onClick={()=>setShowMealModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={modalStyle}>
             <div style={mHandle}/>
             <div style={{fontSize:17,fontWeight:800,color:P.text,marginBottom:4}}>
               {editMealIdx!==null?`${MEAL_LABELS[editMealIdx]} 수정`:`${MEAL_LABELS[dayMeals(mealDate).length]} 추가`}
@@ -573,19 +574,21 @@ export default function App() {
             <div style={{fontSize:12,color:P.rose,fontWeight:700,marginBottom:14}}>{mealDate.replace(/-/g,".")}</div>
             {mealForm.items.map((it,i)=>(
               <div key={i} style={{marginBottom:8}}>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <div style={{flex:2,position:"relative"}}>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  {/* 재료명: 넓게 */}
+                  <div style={{flex:3,position:"relative",minWidth:0}}>
                     <input value={it.name} onChange={e=>updateMI(i,"name",e.target.value)} onFocus={()=>{setActiveII(i);setSugg(cubes.map(c=>c.name));}} onBlur={()=>setTimeout(()=>setSugg([]),200)} placeholder="재료명" style={{...inputSt,width:"100%"}}/>
                     {activeII===i&&sugg.length>0&&(
-                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:300,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:160,overflowY:"auto"}}>
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:300,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:130,overflowY:"auto"}}>
                         {sugg.map(n=>(
                           <div key={n} onMouseDown={()=>pickSugg(n)} onTouchStart={()=>pickSugg(n)} style={{padding:"10px 14px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
                         ))}
                       </div>
                     )}
                   </div>
-                  <input value={it.gram} onChange={e=>updateMI(i,"gram",e.target.value)} placeholder="g" inputMode="numeric" pattern="[0-9]*" style={{...inputSt,flex:1}}/>
-                  {mealForm.items.length>1&&<button onClick={()=>removeMealItem(i)} style={{width:30,height:30,borderRadius:8,border:"none",background:"#FFEBEE",color:"#C62828",fontSize:16,fontWeight:700,cursor:"pointer",flexShrink:0}}>×</button>}
+                  {/* gram: 좁게 */}
+                  <input value={it.gram} onChange={e=>updateMI(i,"gram",e.target.value)} placeholder="g" inputMode="numeric" pattern="[0-9]*" style={{...inputSt,width:60,flexShrink:0,textAlign:"center"}}/>
+                  {mealForm.items.length>1&&<button onClick={()=>removeMealItem(i)} style={{width:28,height:28,borderRadius:8,border:"none",background:"#FFEBEE",color:"#C62828",fontSize:15,fontWeight:700,cursor:"pointer",flexShrink:0}}>×</button>}
                 </div>
               </div>
             ))}
@@ -597,8 +600,8 @@ export default function App() {
 
       {/* ── 큐브 만드는 날 모달 ── */}
       {showCDModal&&(
-        <div style={overlay} onClick={()=>setShowCDModal(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{...modal,maxHeight:"80vh",overflowY:"auto"}}>
+        <div style={overlayStyle} onClick={()=>setShowCDModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={modalStyle}>
             <div style={mHandle}/>
             <div style={{fontSize:17,fontWeight:800,color:P.text,marginBottom:4}}>🧊 큐브 만드는 날</div>
             <div style={{fontSize:12,color:"#8B5CF6",fontWeight:700,marginBottom:14}}>{cdDate.replace(/-/g,".")}</div>
@@ -631,8 +634,8 @@ export default function App() {
 
       {/* ── 큐브 재고 폼 모달 ── */}
       {showCubeForm&&(
-        <div style={overlay} onClick={()=>setShowCubeForm(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{...modal,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={overlayStyle} onClick={()=>setShowCubeForm(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{...modalStyle, maxHeight:"55vh"}}>
             <div style={mHandle}/>
             <div style={{fontSize:17,fontWeight:800,color:P.text,marginBottom:16}}>{editCube?"큐브 수정":"새 큐브 추가"}</div>
             <label style={labelSt}>재료 이름 *</label>
@@ -668,8 +671,13 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap');
         * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; max-width: 100vw; }
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
         ::-webkit-scrollbar { display: none; }
+        /* iOS 키보드 올라올 때 모달 위치 고정 */
+        @supports (-webkit-touch-callout: none) {
+          .modal-wrap { position: fixed !important; bottom: 0 !important; }
+        }
       `}</style>
     </div>
   );
@@ -678,8 +686,14 @@ export default function App() {
 // ── 스타일 상수 ───────────────────────────────────────
 const sBtn    = (bg,color) => ({padding:"6px 10px",borderRadius:10,border:"none",background:bg,fontSize:11,color,cursor:"pointer",fontWeight:600,flexShrink:0});
 const navBtn  = {width:34,height:34,borderRadius:10,border:`1px solid #F0E6DC`,background:"#fff",color:"#C08070",fontSize:18,fontWeight:700,cursor:"pointer"};
-const overlay = {position:"fixed",inset:0,background:"rgba(58,37,32,0.35)",zIndex:200,display:"flex",alignItems:"flex-end"};
-const modal   = {background:"#fff",width:"100%",maxWidth:480,margin:"0 auto",borderRadius:"24px 24px 0 0",padding:"20px 20px 36px",boxShadow:"0 -4px 24px rgba(196,112,80,0.12)"};
+// overlayStyle / modalStyle: iOS 키보드 대응
+// - overlay는 fixed + inset 0으로 전체 덮기
+// - modal은 max-height를 px 고정(45vh 대신 고정값)으로 키보드에 안 걸리게
+const overlayStyle = {position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(58,37,32,0.35)",zIndex:200,display:"flex",flexDirection:"column",justifyContent:"flex-end"};
+const modalStyle   = {background:"#fff",width:"100%",borderRadius:"24px 24px 0 0",padding:"20px 20px 20px",boxShadow:"0 -4px 24px rgba(196,112,80,0.12)",maxHeight:"45vh",overflowY:"auto",boxSizing:"border-box"};
+// 하위 호환
+const overlay = overlayStyle;
+const modal   = modalStyle;
 const mHandle = {width:40,height:4,background:"#F0E6DC",borderRadius:2,margin:"0 auto 18px"};
 const inputSt = {padding:"11px 13px",borderRadius:12,border:"1.5px solid #F0E6DC",fontSize:14,outline:"none",display:"block",fontFamily:"inherit"};
 const labelSt = {fontSize:12,fontWeight:700,color:"#C08070",display:"block",marginBottom:4};
