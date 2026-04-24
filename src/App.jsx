@@ -21,10 +21,12 @@ const DAYS_KO=["일","월","화","수","목","금","토"];
 
 const pad = n => String(n).padStart(2,"0");
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-const addDays = (s,n) => { const d=new Date(s); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+// ★ 문자열 날짜를 로컬 타임존으로 파싱 (UTC 파싱 시 한국에서 날짜 하루 밀림 방지)
+const parseLocal = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (s,n) => { const d=parseLocal(s); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const isExpired = m => addDays(m,VALIDITY_DAYS)<todayStr();
 const isExpiringSoon = m => { const e=addDays(m,VALIDITY_DAYS); return e>=todayStr()&&e<=addDays(todayStr(),3); };
-const weekStart = s => { const d=new Date(s); d.setDate(d.getDate()-d.getDay()); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const weekStart = s => { const d=parseLocal(s); d.setDate(d.getDate()-d.getDay()); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const weekDates = s => Array.from({length:7},(_,i)=>addDays(s,i));
 
 function useLS(key,init){
@@ -42,6 +44,314 @@ const DEFAULT_CUBES=[
   {id:5,name:"사과",   category:"fruit", count:2, made:addDays(TODAY,-4),note:""},
 ];
 
+
+// ── 이미지 크롭 헬퍼 ──────────────────────────────
+function getCroppedImg(imageSrc, crop) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = crop.w; canvas.height = crop.h;
+      canvas.getContext("2d").drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    img.src = imageSrc;
+  });
+}
+
+function ImageCropper({ src, onDone, onCancel }) {
+  const [ratioMode, setRatioMode] = useState("1:1");
+  const [box, setBox] = useState(null);
+  const [imgNat, setImgNat] = useState({ w:1, h:1 });
+  const imgRef = useRef(null);
+  const drag   = useRef(null);
+  const MINSIZE = 40;
+
+  const getIR = () => imgRef.current.getBoundingClientRect();
+  const cl = (v,a,b) => Math.max(a, Math.min(b, v));
+
+  const initBox = useCallback((mode) => {
+    if (!imgRef.current) return;
+    const { width: IW, height: IH } = getIR();
+    const s  = Math.min(IW, IH) * 0.82;
+    const bw = mode === "1:1" ? s : IW * 0.82;
+    const bh = mode === "1:1" ? s : IH * 0.72;
+    setBox({ x:(IW-bw)/2, y:(IH-bh)/2, w:bw, h:bh });
+  }, []);
+
+  const onImgLoad = () => {
+    const img = imgRef.current;
+    setImgNat({ w: img.naturalWidth, h: img.naturalHeight });
+    initBox(ratioMode);
+  };
+
+  const toggleRatio = (mode) => {
+    setRatioMode(mode);
+    setTimeout(() => initBox(mode), 0);
+  };
+
+  const startDrag = (e, type) => {
+    e.preventDefault(); e.stopPropagation();
+    const pt = e.touches ? e.touches[0] : e;
+    drag.current = { type, sx: pt.clientX, sy: pt.clientY, orig: { ...box } };
+  };
+
+  useEffect(() => {
+    const move = (e) => {
+      if (!drag.current || !box || !imgRef.current) return;
+      if (e.cancelable) e.preventDefault();
+      const pt  = e.touches ? e.touches[0] : e;
+      const dx  = pt.clientX - drag.current.sx;
+      const dy  = pt.clientY - drag.current.sy;
+      const ob  = drag.current.orig;
+      const { width: IW, height: IH } = getIR();
+      const { type } = drag.current;
+      let { x, y, w, h } = ob;
+
+      if (type === "move") {
+        x = cl(ob.x + dx, 0, IW - ob.w);
+        y = cl(ob.y + dy, 0, IH - ob.h);
+        setBox({ x, y, w, h }); return;
+      }
+      if (type === "se") {
+        w = cl(ob.w + dx, MINSIZE, IW - ob.x);
+        h = ratioMode === "1:1" ? w : cl(ob.h + dy, MINSIZE, IH - ob.y);
+      } else if (type === "sw") {
+        const nw = cl(ob.w - dx, MINSIZE, ob.x + ob.w);
+        const nh = ratioMode === "1:1" ? nw : cl(ob.h + dy, MINSIZE, IH - ob.y);
+        x = ob.x + ob.w - nw; w = nw; h = nh;
+      } else if (type === "ne") {
+        const nw = cl(ob.w + dx, MINSIZE, IW - ob.x);
+        const nh = ratioMode === "1:1" ? nw : cl(ob.h - dy, MINSIZE, ob.y + ob.h);
+        y = ob.y + ob.h - nh; w = nw; h = nh;
+      } else if (type === "nw") {
+        const nw = cl(ob.w - dx, MINSIZE, ob.x + ob.w);
+        const nh = ratioMode === "1:1" ? nw : cl(ob.h - dy, MINSIZE, ob.y + ob.h);
+        x = ob.x + ob.w - nw; y = ob.y + ob.h - nh; w = nw; h = nh;
+      }
+      x = cl(x, 0, IW - w); y = cl(y, 0, IH - h);
+      w = cl(w, MINSIZE, IW - x); h = cl(h, MINSIZE, IH - y);
+      setBox({ x, y, w, h });
+    };
+    const up = () => { drag.current = null; };
+    window.addEventListener("pointermove", move, { passive:false });
+    window.addEventListener("touchmove",   move, { passive:false });
+    window.addEventListener("pointerup",  up);
+    window.addEventListener("touchend",   up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("touchmove",   move);
+      window.removeEventListener("pointerup",  up);
+      window.removeEventListener("touchend",   up);
+    };
+  }, [box, ratioMode]);
+
+  const handleDone = async () => {
+    if (!box || !imgRef.current) return;
+    const ir = getIR();
+    const sx = imgNat.w / ir.width, sy = imgNat.h / ir.height;
+    onDone(await getCroppedImg(src, {
+      x: Math.round(box.x*sx), y: Math.round(box.y*sy),
+      w: Math.round(box.w*sx), h: Math.round(box.h*sy),
+    }));
+  };
+
+  const H = ({ type, pos }) => (
+    <div onPointerDown={e=>startDrag(e,type)} onTouchStart={e=>startDrag(e,type)}
+      style={{position:"absolute",width:22,height:22,background:"#fff",
+              border:"3px solid #E8A598",borderRadius:5,touchAction:"none",
+              cursor:"pointer",zIndex:20,...pos}}/>
+  );
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000",zIndex:400,
+                 display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <div style={{position:"relative",width:"92vw",maxWidth:440,
+                   display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <img ref={imgRef} src={src} onLoad={onImgLoad} draggable={false}
+          style={{display:"block",width:"100%",maxHeight:"58vh",objectFit:"contain",
+                  userSelect:"none",pointerEvents:"none"}}/>
+        {box&&(
+          <>
+            <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+              <svg width="100%" height="100%" style={{position:"absolute",inset:0}}>
+                <defs><mask id="cm">
+                  <rect width="100%" height="100%" fill="white"/>
+                  <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="black"/>
+                </mask></defs>
+                <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#cm)"/>
+              </svg>
+            </div>
+            <div onPointerDown={e=>startDrag(e,"move")} onTouchStart={e=>startDrag(e,"move")}
+              style={{position:"absolute",left:box.x,top:box.y,width:box.w,height:box.h,
+                      border:"2px solid #E8A598",cursor:"move",touchAction:"none",boxSizing:"border-box"}}>
+              {[1,2].map(n=>(
+                <React.Fragment key={n}>
+                  <div style={{position:"absolute",left:`${n*33.3}%`,top:0,width:1,height:"100%",background:"rgba(255,255,255,0.25)"}}/>
+                  <div style={{position:"absolute",top:`${n*33.3}%`,left:0,height:1,width:"100%",background:"rgba(255,255,255,0.25)"}}/>
+                </React.Fragment>
+              ))}
+              <H type="nw" pos={{left:-11,top:-11}}/>
+              <H type="ne" pos={{right:-11,top:-11}}/>
+              <H type="sw" pos={{left:-11,bottom:-11}}/>
+              <H type="se" pos={{right:-11,bottom:-11}}/>
+            </div>
+          </>
+        )}
+      </div>
+      <div style={{marginTop:20,display:"flex",flexDirection:"column",alignItems:"center",gap:14,width:"92vw",maxWidth:440}}>
+        <div style={{display:"flex",gap:8}}>
+          {[{v:"1:1",label:"1 : 1"},{v:"free",label:"자유 비율"}].map(({v,label})=>(
+            <button key={v} onClick={()=>toggleRatio(v)}
+              style={{padding:"8px 20px",borderRadius:20,border:"none",
+                      background:ratioMode===v?"#E8A598":"rgba(255,255,255,0.15)",
+                      color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:10,width:"100%"}}>
+          <button onClick={onCancel}
+            style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.3)",
+                    background:"transparent",color:"rgba(255,255,255,0.8)",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            취소
+          </button>
+          <button onClick={handleDone}
+            style={{flex:2,padding:"14px",borderRadius:14,border:"none",
+                    background:"#E8A598",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>
+            적용하기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── 이유식 가이드 데이터 ─────────────────────────────
+const GUIDE = [
+  {
+    month: 6,
+    stage: "초기",
+    tag: "이유식 시작!",
+    color: "#74C69D",
+    bg: "#E8F5EE",
+    totalRange: "30~80g",
+    grainRange: "30~50g",
+    meatRange: "10g (+~10g)",
+    vegRange: "10~20g",
+    meals: 1,
+    memo: [
+      "만 6개월(180일)부터 시작",
+      "입으로 먹는 연습 + 알러지 테스트",
+      "아기가 안 먹고 흘려도 스트레스 받지 마세요 😊",
+      "4일차부터는 쌀미음과 소고기를 기본으로",
+      "테스트 한 음식은 추가 반찬으로 주기",
+      "야채는 정해진 날짜 없이 3일 간격으로만 바꿔가며 테스트",
+    ],
+    foods: ["쌀미음","소고기","브로콜리","단호박","애호박","청경채","시금치","당근","고구마","밤 등"],
+  },
+  {
+    month: 7,
+    stage: "중기",
+    tag: "2끼 시작",
+    color: "#F59E0B",
+    bg: "#FFFBEB",
+    totalRange: "80~120g",
+    grainRange: "40~60g",
+    meatRange: "10g (+~10g)",
+    vegRange: "30~40g",
+    meals: 2,
+    memo: [
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "밀가루·계란·땅콩 소량씩 테스트",
+      "중기 이유식의 목표는 입으로 잡자 연습 및 닭고기 시작",
+      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
+      "너무 복잡할 경우 죽 OR 밥솥 이유식으로 변경",
+    ],
+    foods: ["쌀현미","쌀오트","쌀흑미","닭고기","소고기","연어","흰살생선","두부","다양한 채소"],
+  },
+  {
+    month: 8,
+    stage: "중기",
+    tag: "",
+    color: "#F59E0B",
+    bg: "#FFFBEB",
+    totalRange: "80~120g",
+    grainRange: "40~60g",
+    meatRange: "10g (+~10g)",
+    vegRange: "30~40g",
+    meals: 2,
+    memo: [
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
+      "저는 쌀과 오트밀 1:1비율로 만든 죽을 베이스로 사용",
+      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
+      "입자가 좀 더 굵어진다 → 농도·입자감이 바뀌어서 밥태기가 올 수 있음",
+    ],
+    foods: ["쌀오트","쌀흑미","쌀현미","닭고기","새우","흰살생선","계란","다양한 채소"],
+  },
+  {
+    month: 9,
+    stage: "후기",
+    tag: "",
+    color: "#E8A598",
+    bg: "#FFF0EB",
+    totalRange: "120~180g",
+    grainRange: "60~100g",
+    meatRange: "10~15g (+~10g)",
+    vegRange: "40~60g",
+    meals: 3,
+    memo: [
+      "1끼 → 2끼 → 3끼, 반찬 2가지씩",
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+    ],
+    foods: ["쌀현미","쌀오트","쌀보리","소고기","닭고기","두부","계란","다양한 채소"],
+  },
+  {
+    month: 10,
+    stage: "후기",
+    tag: "",
+    color: "#E8A598",
+    bg: "#FFF0EB",
+    totalRange: "120~180g",
+    grainRange: "60~100g",
+    meatRange: "10~15g (+~10g)",
+    vegRange: "40~60g",
+    meals: 3,
+    memo: [
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능",
+    ],
+    foods: ["쌀오트","쌀흑미","쌀보리","소고기","닭고기","새우","오징어","다양한 채소"],
+  },
+  {
+    month: 11,
+    stage: "후기",
+    tag: "",
+    color: "#E8A598",
+    bg: "#FFF0EB",
+    totalRange: "120~180g",
+    grainRange: "60~100g",
+    meatRange: "10~15g (+~10g)",
+    vegRange: "40~60g",
+    meals: 3,
+    memo: [
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
+      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
+      "입자가 좀 더 굵어진다 → 밥태기가 올 수 있음",
+    ],
+    foods: ["쌀현미","쌀오트","쌀보리","소고기","닭고기","새우","잔멸치","오징어","다양한 채소"],
+  },
+];
+
 const BabyIllust=({size=56})=>(
   <svg viewBox="0 0 56 56" width={size} height={size}>
     <circle cx="28" cy="28" r="28" fill="#FADDD8"/>
@@ -53,11 +363,9 @@ const BabyIllust=({size=56})=>(
   </svg>
 );
 
-// ── 전체화면 페이지 래퍼 (모달 대신 사용 — iOS 키보드 문제 해결) ──
 function FullPage({title,subtitle,onClose,children}){
   return (
     <div style={{position:"fixed",inset:0,background:P.bg,zIndex:300,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-      {/* 헤더 */}
       <div style={{position:"sticky",top:0,background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,zIndex:10}}>
         <button onClick={onClose} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -69,10 +377,38 @@ function FullPage({title,subtitle,onClose,children}){
           {subtitle&&<div style={{fontSize:11,color:P.rose,fontWeight:600,marginTop:1}}>{subtitle}</div>}
         </div>
       </div>
-      {/* 내용 */}
       <div style={{padding:"20px 16px 120px"}}>
         {children}
       </div>
+    </div>
+  );
+}
+
+// ── 큐브 알림 배너 ──────────────────────────────────
+function CubeBanner({ cubeDays }){
+  const today=todayStr(), tomorrow=addDays(today,1);
+  const todayList=cubeDays[today]||[], tomorrowList=cubeDays[tomorrow]||[];
+  if(todayList.length===0&&tomorrowList.length===0) return null;
+  return(
+    <div style={{margin:"10px 14px 0",display:"flex",flexDirection:"column",gap:6}}>
+      {todayList.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"#FDF0D5",borderRadius:12,padding:"10px 14px",border:"1px solid #F0D9A0"}}>
+          <span style={{fontSize:18}}>👩‍🍳</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#8B6010"}}>오늘은 {todayList.join(" ")} 큐브 만드는 날!</div>
+            <div style={{fontSize:11,color:"#B07D2A",marginTop:1}}>오늘 꼭 만들어주세요 😊</div>
+          </div>
+        </div>
+      )}
+      {tomorrowList.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"#FAF6F2",borderRadius:12,padding:"10px 14px",border:"1px solid #F0E6DC"}}>
+          <span style={{fontSize:18}}>📅</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#8B6010"}}>내일은 {tomorrowList.join(" ")} 큐브 만드는 날!</div>
+            <div style={{fontSize:11,color:"#C4A090",marginTop:1}}>미리 재료를 준비해두세요</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -84,20 +420,18 @@ export default function App(){
   const [meals,setMeals]=useLS("baby_meals_v2",{});
   const [cubeDays,setCubeDays]=useLS("baby_cube_days_v1",{});
 
-  // ── 페이지 상태 ──
-  // page: "main" | "profile" | "meal" | "cubeday" | "cubeform"
   const [page,setPage]=useState("main");
   const [mainTab,setMainTab]=useState("cube");
   const [cubeTab,setCubeTab]=useState("stock");
   const [dietView,setDietView]=useState("week");
   const [filterCat,setFilterCat]=useState("all");
+  const [selMonth,setSelMonth]=useState(6); // 가이드 페이지 선택 개월수
 
-  // 프로필 설정
   const [profileDraft,setProfileDraft]=useState({name:"",photo:""});
+  const [cropSrc,setCropSrc]=useState(null); // 크롭 대기 중인 원본 이미지
   const photoInputRef=useRef(null);
   useEffect(()=>{ if(!babyName){ setProfileDraft({name:"",photo:""}); setPage("profile"); } },[]);
 
-  // 식단 관련
   const [mealDate,setMealDate]=useState(TODAY);
   const [editMealIdx,setEditMealIdx]=useState(null);
   const [mealForm,setMealForm]=useState({items:[{name:"",gram:""}]});
@@ -106,33 +440,44 @@ export default function App(){
   const dayMeals=d=>meals[d]||[];
   const totalGram=d=>dayMeals(d).reduce((s,m)=>s+m.items.reduce((ss,it)=>ss+(Number(it.gram)||0),0),0);
 
-  // 큐브 만드는 날
   const [cdDate,setCdDate]=useState(TODAY);
   const [cdInput,setCdInput]=useState("");
   const [cdSugg,setCdSugg]=useState([]);
   const cdList=d=>cubeDays[d]||[];
 
-  // 큐브 재고 폼
   const [editCube,setEditCube]=useState(null);
   const [cubeForm,setCubeForm]=useState({name:"",category:"veggie",count:0,made:TODAY,note:""});
 
-  // 주간 스크롤
+  // ── 주간 스크롤 ──────────────────────────────────
   const today=todayStr();
   const todayWS=weekStart(today);
+
   const scrollRef=useRef(null);
   const weekRefs=useRef({});
   const allWeekStarts=useCallback(()=>Array.from({length:13},(_,i)=>addDays(todayWS,(i-8)*7)),[todayWS]);
+
+  // 식단표 탭 진입 or 주간뷰 전환 시 오늘 주로 이동 (instant, 애니메이션 없음)
+  const prevMainTab=useRef(mainTab);
+  const prevDietView=useRef(dietView);
+  const scrollToWS=(ws,behavior="instant")=>{
+    setTimeout(()=>{
+      const el=weekRefs.current[ws];
+      if(el&&scrollRef.current) scrollRef.current.scrollTo({top:el.offsetTop-52,behavior});
+    },30);
+  };
   useEffect(()=>{
-    if(mainTab!=="diet"||dietView!=="week") return;
-    setTimeout(()=>{ const el=weekRefs.current[todayWS]; if(el&&scrollRef.current) scrollRef.current.scrollTo({top:el.offsetTop-8,behavior:"instant"}); },60);
+    const tabChanged=prevMainTab.current!=="diet"&&mainTab==="diet";
+    const viewChanged=prevDietView.current!=="week"&&dietView==="week";
+    prevMainTab.current=mainTab;
+    prevDietView.current=dietView;
+    if((tabChanged||viewChanged)&&mainTab==="diet"&&dietView==="week") scrollToWS(todayWS);
   },[mainTab,dietView,todayWS]);
 
-  // 월간
   const nowD=new Date();
   const [calYear,setCalYear]=useState(nowD.getFullYear());
   const [calMonth,setCalMonth]=useState(nowD.getMonth());
   const [selDate,setSelDate]=useState(today);
-  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const firstDay=new Date(calYear,calMonth,1).getDay(); // 이미 로컬 파싱
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
   const prevMonth=()=>{ if(calMonth===0){setCalYear(y=>y-1);setCalMonth(11);}else setCalMonth(m=>m-1); };
   const nextMonth=()=>{ if(calMonth===11){setCalYear(y=>y+1);setCalMonth(0);}else setCalMonth(m=>m+1); };
@@ -147,18 +492,27 @@ export default function App(){
   const openAddMeal=d=>{ setMealDate(d); setEditMealIdx(null); setMealForm({items:[{name:"",gram:""}]}); setSugg([]); setActiveII(null); setPage("meal"); };
   const openEditMeal=(d,i)=>{ setMealDate(d); setEditMealIdx(i); setMealForm({items:[...dayMeals(d)[i].items.map(x=>({...x}))]}); setSugg([]); setActiveII(null); setPage("meal"); };
   const openCubeDay=d=>{ setCdDate(d); setCdInput(""); setCdSugg([]); setPage("cubeday"); };
-  const openAddCube=()=>{ setEditCube(null); setCubeForm({name:"",category:"veggie",count:0,made:today,note:""}); setPage("cubeform"); };
-  const openEditCube=c=>{ setEditCube(c); setCubeForm({name:c.name,category:c.category,count:c.count,made:c.made,note:c.note}); setPage("cubeform"); };
+  const openAddCube=()=>{ setEditCube(null); setCubeForm({name:"",category:"veggie",count:0,made:today,expiry:addDays(today,VALIDITY_DAYS),note:""}); setPage("cubeform"); };
+  const openEditCube=c=>{ setEditCube(c); setCubeForm({name:c.name,category:c.category,count:c.count,made:c.made,expiry:c.expiry||addDays(c.made,VALIDITY_DAYS),note:c.note}); setPage("cubeform"); };
 
-  // ── 저장 핸들러 ──
+  const goBackToMain=(dateStr)=>{
+    if(dateStr){
+      // 저장한 날짜 주로 instant 이동 (page가 main으로 바뀐 후 실행)
+      setTimeout(()=>scrollToWS(weekStart(dateStr)),50);
+    }
+    setPage("main");
+  };
+
   const saveProfile=()=>{ setBabyName(profileDraft.name); setBabyPhoto(profileDraft.photo); setPage("main"); };
+
   const saveMeal=()=>{
     const f=mealForm.items.filter(i=>i.name.trim());
     if(!f.length) return;
     const prev=dayMeals(mealDate);
     setMeals(m=>({...m,[mealDate]:editMealIdx!==null?prev.map((x,i)=>i===editMealIdx?{items:f}:x):[...prev,{items:f}]}));
-    setPage("main");
+    goBackToMain(mealDate);
   };
+
   const deleteMeal=(d,i)=>setMeals(m=>({...m,[d]:dayMeals(d).filter((_,j)=>j!==i)}));
   const addMealItem=()=>setMealForm(f=>({items:[...f.items,{name:"",gram:""}]}));
   const removeMealItem=i=>setMealForm(f=>({items:f.items.filter((_,j)=>j!==i)}));
@@ -169,19 +523,22 @@ export default function App(){
   const pickSugg=name=>{ if(activeII===null)return; setMealForm(f=>({items:f.items.map((it,i)=>i===activeII?{...it,name}:it)})); setSugg([]); setActiveII(null); };
   const addCD=()=>{ const v=cdInput.trim(); if(!v)return; if(!cdList(cdDate).includes(v)) setCubeDays(cd=>({...cd,[cdDate]:[...cdList(cdDate),v]})); setCdInput(""); setCdSugg([]); };
   const removeCD=(d,n)=>setCubeDays(cd=>({...cd,[d]:cdList(d).filter(x=>x!==n)}));
+
   const saveCube=()=>{
     if(!cubeForm.name.trim())return;
-    if(editCube) setCubes(cs=>cs.map(c=>c.id===editCube.id?{...c,...cubeForm,count:Number(cubeForm.count)}:c));
-    else setCubes(cs=>[...cs,{...cubeForm,id:Date.now(),count:Number(cubeForm.count)}]);
+    if(editCube) setCubes(cs=>cs.map(c=>c.id===editCube.id?{...c,...cubeForm,count:Number(cubeForm.count),expiry:cubeForm.expiry||addDays(cubeForm.made,VALIDITY_DAYS)}:c));
+    else setCubes(cs=>[...cs,{...cubeForm,id:Date.now(),count:Number(cubeForm.count),expiry:cubeForm.expiry||addDays(cubeForm.made,VALIDITY_DAYS)}]);
     setPage("main");
   };
   const deleteCube=id=>setCubes(cs=>cs.filter(c=>c.id!==id));
   const changeCount=(id,delta)=>setCubes(cs=>cs.map(c=>c.id===id?{...c,count:Math.max(0,c.count+delta)}:c));
 
+
+
   // ── 날짜 카드 ──
   const renderDayCard=(dateStr,compact=false)=>{
     const dm=dayMeals(dateStr),cdl=cdList(dateStr),gram=totalGram(dateStr);
-    const isToday=dateStr===today,dow=new Date(dateStr).getDay(),dayNum=Number(dateStr.slice(8));
+    const isToday=dateStr===today,dow=parseLocal(dateStr).getDay(),dayNum=Number(dateStr.slice(8));
     if(compact){
       const isSel=dateStr===selDate;
       return(
@@ -189,7 +546,7 @@ export default function App(){
           <div style={{fontSize:13,fontWeight:isSel||isToday?700:400,color:isSel?"#fff":dow===0?"#E53935":dow===6?"#3B82F6":P.text}}>{dayNum}</div>
           {dm.length>0&&<div style={{fontSize:9,color:isSel?"rgba(255,255,255,0.9)":P.rose,fontWeight:700}}>{dm.length}끼</div>}
           {gram>0&&<div style={{fontSize:9,color:isSel?"rgba(255,255,255,0.75)":P.textSub}}>{gram}g</div>}
-          {cdl.length>0&&<div style={{fontSize:9,color:isSel?"rgba(255,255,255,0.85)":"#8B5CF6",fontWeight:700}}>🧊{cdl.length}</div>}
+          {cdl.length>0&&<div style={{fontSize:9,color:isSel?"rgba(255,255,255,0.85)":"#B07D2A",fontWeight:700}}>큐브</div>}
         </div>
       );
     }
@@ -204,16 +561,16 @@ export default function App(){
             {gram>0&&<span style={{fontSize:11,color:P.rose,fontWeight:700,background:"#FFF0EB",padding:"2px 8px",borderRadius:10}}>총 {gram}g</span>}
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>openCubeDay(dateStr)} style={{padding:"4px 10px",borderRadius:10,border:"1.5px solid #8B5CF6",background:"#F5F3FF",color:"#8B5CF6",fontSize:11,fontWeight:700,cursor:"pointer"}}>🧊 큐브</button>
+            <button onClick={()=>openCubeDay(dateStr)} style={{padding:"4px 10px",borderRadius:10,border:"none",background:"#FDF0D5",color:"#B07D2A",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ 큐브</button>
             {dm.length<3&&<button onClick={()=>openAddMeal(dateStr)} style={{padding:"4px 10px",borderRadius:10,border:"none",background:P.rose,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ 끼니</button>}
           </div>
         </div>
         {cdl.length>0&&(
           <div style={{padding:"0 14px 6px",display:"flex",gap:6,flexWrap:"wrap"}}>
             {cdl.map(n=>(
-              <span key={n} style={{fontSize:11,background:"#F5F3FF",color:"#7C3AED",borderRadius:8,padding:"3px 10px",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
-                🧊 {n} 큐브 만드는 날
-                <span onClick={()=>removeCD(dateStr,n)} style={{cursor:"pointer",color:"#bbb",fontSize:12}}>×</span>
+              <span key={n} style={{fontSize:11,background:"#FDF0D5",color:"#B07D2A",borderRadius:8,padding:"3px 10px",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                {n} 큐브 만드는 날
+                <span onClick={()=>removeCD(dateStr,n)} style={{cursor:"pointer",color:"#C4A090",fontSize:12}}>×</span>
               </span>
             ))}
           </div>
@@ -249,20 +606,107 @@ export default function App(){
     );
   };
 
-  // ════════════════════════════════════════════════
   // ── 전체화면 페이지들 ──
-  // ════════════════════════════════════════════════
 
-  // 프로필 설정 페이지
+  // ── 가이드 페이지 ─────────────────────────────────
+  if(page==="guide") return(
+    <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      <div style={{position:"sticky",top:0,background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,zIndex:10}}>
+        <button onClick={()=>setPage("main")} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 1l12 12M13 1L1 13" stroke={P.roseDark} strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        </button>
+        <div style={{fontSize:16,fontWeight:800,color:P.text}}>📋 개월수별 이유식 가이드</div>
+      </div>
+      <div style={{padding:"16px 16px 80px"}}>
+        {(()=>{
+          const g=GUIDE.find(x=>x.month===selMonth)||GUIDE[0];
+          return(
+            <>
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,scrollbarWidth:"none",marginBottom:16}}>
+                {GUIDE.map(x=>(
+                  <button key={x.month} onClick={()=>setSelMonth(x.month)}
+                    style={{flexShrink:0,padding:"6px 14px",borderRadius:20,border:"none",
+                            background:selMonth===x.month?x.color:"#F0EBE7",
+                            color:selMonth===x.month?"#fff":P.textSub,
+                            fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                    {x.month}개월
+                  </button>
+                ))}
+              </div>
+
+              {/* 단계 뱃지 */}
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                <span style={{fontSize:20,fontWeight:900,color:P.text}}>{g.month}개월</span>
+                <span style={{padding:"3px 12px",borderRadius:20,background:g.color,color:"#fff",fontSize:12,fontWeight:700}}>{g.stage}</span>
+                {g.tag&&<span style={{padding:"3px 10px",borderRadius:20,background:g.bg,color:g.color,fontSize:12,fontWeight:700,border:`1px solid ${g.color}`}}>{g.tag}</span>}
+              </div>
+
+              {/* 권장량 카드 */}
+              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>📊 1끼 권장량</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[
+                    {label:"1끼 총량",val:g.totalRange,emoji:"🍱"},
+                    {label:"하루 끼니",val:`${g.meals}끼`,emoji:"🕐"},
+                    {label:"곡물",val:g.grainRange,emoji:"🌾"},
+                    {label:"고기",val:g.meatRange,emoji:"🥩"},
+                    {label:"야채",val:g.vegRange,emoji:"🥕"},
+                  ].map(({label,val,emoji})=>(
+                    <div key={label} style={{background:g.bg,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:11,color:P.textSub,marginBottom:2}}>{emoji} {label}</div>
+                      <div style={{fontSize:14,fontWeight:800,color:g.color}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 추천 식재료 */}
+              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>🥗 이 시기 식재료</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {g.foods.map(f=>(
+                    <span key={f} style={{fontSize:12,background:g.bg,color:g.color,borderRadius:8,padding:"4px 10px",fontWeight:600}}>{f}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 메모 */}
+              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${P.border}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>💡 이 시기 포인트</div>
+                {g.memo.map((m,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"flex-start"}}>
+                    <span style={{fontSize:12,color:g.color,fontWeight:700,flexShrink:0,marginTop:1}}>✓</span>
+                    <span style={{fontSize:12,color:P.text,lineHeight:1.6}}>{m}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          );
+        })()}
+      </div>
+      <style>{fontImport}</style>
+    </div>
+  );
+
   if(page==="profile") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      {cropSrc&&(
+        <ImageCropper
+          src={cropSrc}
+          aspectRatio={1}
+          onDone={cropped=>{ setProfileDraft(d=>({...d,photo:cropped})); setCropSrc(null); }}
+          onCancel={()=>{ setCropSrc(null); if(photoInputRef.current) photoInputRef.current.value=""; }}
+        />
+      )}
       <FullPage title="아기 프로필 설정" onClose={()=>setPage("main")}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:28}}>
           <div onClick={()=>photoInputRef.current?.click()} style={{width:90,height:90,borderRadius:"50%",overflow:"hidden",border:`3px solid ${P.rose}`,cursor:"pointer",background:P.rosePale,display:"flex",alignItems:"center",justifyContent:"center"}}>
             {profileDraft.photo?<img src={profileDraft.photo} alt="미리보기" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<BabyIllust size={90}/>}
           </div>
           <button onClick={()=>photoInputRef.current?.click()} style={{fontSize:13,padding:"6px 18px",borderRadius:10,border:`1px solid ${P.border}`,background:P.surface,color:P.roseDark,cursor:"pointer"}}>📷 사진 선택</button>
-          <input ref={photoInputRef} type="file" accept="image/*" onChange={e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setProfileDraft(d=>({...d,photo:ev.target.result})); r.readAsDataURL(f); }} style={{display:"none"}}/>
+          <input ref={photoInputRef} type="file" accept="image/*" onChange={e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setCropSrc(ev.target.result); r.readAsDataURL(f); }} style={{display:"none"}}/>
         </div>
         <label style={labelSt}>아기 이름</label>
         <input value={profileDraft.name} onChange={e=>setProfileDraft(d=>({...d,name:e.target.value}))} placeholder="예: 지우, 민준" style={{...inputSt,width:"100%",marginBottom:24}}/>
@@ -272,22 +716,14 @@ export default function App(){
     </div>
   );
 
-  // 끼니 추가/수정 페이지
   if(page==="meal") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
-      <FullPage title={editMealIdx!==null?`${MEAL_LABELS[editMealIdx]} 수정`:`${MEAL_LABELS[dayMeals(mealDate).length]} 추가`} subtitle={mealDate.replace(/-/g,".")} onClose={()=>setPage("main")}>
+      <FullPage title={editMealIdx!==null?`${MEAL_LABELS[editMealIdx]} 수정`:`${MEAL_LABELS[dayMeals(mealDate).length]} 추가`} subtitle={mealDate.replace(/-/g,".")} onClose={()=>goBackToMain(mealDate)}>
         {mealForm.items.map((it,i)=>(
           <div key={i} style={{marginBottom:10}}>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <div style={{flex:3,position:"relative",minWidth:0}}>
-                <input
-                  value={it.name}
-                  onChange={e=>updateMI(i,"name",e.target.value)}
-                  onFocus={()=>{ setActiveII(i); setSugg(cubes.map(c=>c.name)); }}
-                  onBlur={()=>setTimeout(()=>setSugg([]),150)}
-                  placeholder="재료명"
-                  style={{...inputSt,width:"100%"}}
-                />
+                <input value={it.name} onChange={e=>updateMI(i,"name",e.target.value)} onFocus={()=>{ setActiveII(i); setSugg(cubes.map(c=>c.name)); }} onBlur={()=>setTimeout(()=>setSugg([]),150)} placeholder="재료명" style={{...inputSt,width:"100%"}}/>
                 {activeII===i&&sugg.length>0&&(
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:180,overflowY:"auto"}}>
                     {sugg.map(n=>(
@@ -308,48 +744,38 @@ export default function App(){
     </div>
   );
 
-  // 큐브 만드는 날 페이지
   if(page==="cubeday") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
-      <FullPage title="🧊 큐브 만드는 날" subtitle={cdDate.replace(/-/g,".")} onClose={()=>setPage("main")}>
+      <FullPage title="큐브 만드는 날" subtitle={cdDate.replace(/-/g,".")} onClose={()=>goBackToMain(cdDate)}>
         {cdList(cdDate).length>0&&(
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             {cdList(cdDate).map(n=>(
-              <span key={n} style={{fontSize:13,background:"#F5F3FF",color:"#7C3AED",borderRadius:10,padding:"6px 14px",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
-                🧊 {n}
-                <span onClick={()=>removeCD(cdDate,n)} style={{cursor:"pointer",color:"#bbb",fontSize:16}}>×</span>
+              <span key={n} style={{fontSize:13,background:"#FDF0D5",color:"#B07D2A",borderRadius:10,padding:"6px 14px",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+                {n}
+                <span onClick={()=>removeCD(cdDate,n)} style={{cursor:"pointer",color:"#C4A090",fontSize:16}}>×</span>
               </span>
             ))}
           </div>
         )}
         <div style={{position:"relative",marginBottom:16}}>
           <div style={{display:"flex",gap:8}}>
-            <input
-              value={cdInput}
-              onChange={e=>{ setCdInput(e.target.value); const q=e.target.value.toLowerCase(); setCdSugg(q?cubes.map(c=>c.name).filter(n=>n.toLowerCase().includes(q)):cubes.map(c=>c.name)); }}
-              onFocus={()=>setCdSugg(cubes.map(c=>c.name))}
-              onBlur={()=>setTimeout(()=>setCdSugg([]),150)}
-              placeholder="재료명 입력 또는 선택"
-              style={{...inputSt,flex:1}}
-              onKeyDown={e=>e.key==="Enter"&&addCD()}
-            />
-            <button onClick={addCD} style={{padding:"0 18px",borderRadius:12,border:"none",background:"#8B5CF6",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>추가</button>
+            <input value={cdInput} onChange={e=>{ setCdInput(e.target.value); const q=e.target.value.toLowerCase(); setCdSugg(q?cubes.map(c=>c.name).filter(n=>n.toLowerCase().includes(q)):cubes.map(c=>c.name)); }} onFocus={()=>setCdSugg(cubes.map(c=>c.name))} onBlur={()=>setTimeout(()=>setCdSugg([]),150)} placeholder="재료명 입력 또는 선택" style={{...inputSt,flex:1}} onKeyDown={e=>e.key==="Enter"&&addCD()}/>
+            <button onClick={addCD} style={{padding:"0 18px",borderRadius:12,border:"none",background:"#D4A843",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>추가</button>
           </div>
           {cdSugg.length>0&&(
-            <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:"1.5px solid #8B5CF6",borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:200,overflowY:"auto"}}>
+            <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:"1.5px solid #D4A843",borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:200,overflowY:"auto"}}>
               {cdSugg.map(n=>(
-                <div key={n} onMouseDown={()=>{ setCdInput(n); setCdSugg([]); }} onTouchEnd={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>🧊 {n}</div>
+                <div key={n} onMouseDown={()=>{ setCdInput(n); setCdSugg([]); }} onTouchEnd={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
               ))}
             </div>
           )}
         </div>
-        <button onClick={()=>setPage("main")} style={{...saveSt,background:"#8B5CF6"}}>완료</button>
+        <button onClick={()=>goBackToMain(cdDate)} style={{...saveSt,background:"#D4A843"}}>완료</button>
       </FullPage>
       <style>{fontImport}</style>
     </div>
   );
 
-  // 큐브 재고 추가/수정 페이지
   if(page==="cubeform") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
       <FullPage title={editCube?"큐브 수정":"새 큐브 추가"} onClose={()=>setPage("main")}>
@@ -372,9 +798,16 @@ export default function App(){
           </div>
           <div style={{flex:1}}>
             <label style={labelSt}>제조일</label>
-            <input type="date" value={cubeForm.made} onChange={e=>setCubeForm({...cubeForm,made:e.target.value})} style={{...inputSt,width:"100%"}}/>
-            <div style={{fontSize:11,color:P.textSub,marginTop:5}}>유효기간: <span style={{color:P.rose,fontWeight:700}}>{addDays(cubeForm.made,VALIDITY_DAYS)}</span></div>
+            <input type="date" value={cubeForm.made} onChange={e=>{
+              const newMade=e.target.value;
+              setCubeForm(f=>({...f,made:newMade,expiry:addDays(newMade,VALIDITY_DAYS)}));
+            }} style={{...inputSt,width:"100%"}}/>
           </div>
+        </div>
+        <label style={labelSt}>유효기간</label>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+          <input type="date" value={cubeForm.expiry||addDays(cubeForm.made,VALIDITY_DAYS)} onChange={e=>setCubeForm({...cubeForm,expiry:e.target.value})} style={{...inputSt,flex:1}}/>
+          <button onClick={()=>setCubeForm(f=>({...f,expiry:addDays(f.made,VALIDITY_DAYS)}))} style={{padding:"12px 12px",borderRadius:12,border:`1px solid ${P.border}`,background:P.rosePale,color:P.roseDark,fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>2주 자동</button>
         </div>
         <label style={labelSt}>메모 (선택)</label>
         <input value={cubeForm.note} onChange={e=>setCubeForm({...cubeForm,note:e.target.value})} placeholder="알레르기, 아기 반응 등" style={{...inputSt,width:"100%",marginBottom:24}}/>
@@ -384,13 +817,9 @@ export default function App(){
     </div>
   );
 
-  // ════════════════════════════════════════════════
   // ── 메인 화면 ──
-  // ════════════════════════════════════════════════
   return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
-
-      {/* 헤더 */}
       <div style={{background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"16px 16px 0"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
           <div onClick={openProfile} style={{width:54,height:54,borderRadius:"50%",overflow:"hidden",border:`2.5px solid ${P.rose}`,flexShrink:0,cursor:"pointer",background:P.rosePale,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -401,12 +830,21 @@ export default function App(){
             <div style={{color:P.text,fontSize:17,fontWeight:900,marginTop:1,lineHeight:1.2}}>{babyName?`${babyName} 이유식 다이어리`:"이유식 다이어리"}</div>
             <div style={{color:P.textSub,fontSize:10,marginTop:2}}>{today.replace(/-/g,".")} · 우리 아기 식단 기록</div>
           </div>
-          <button onClick={openProfile} style={{width:32,height:32,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="2" stroke={P.roseDark} strokeWidth="1.2"/>
-              <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.4 2.4l1.1 1.1M10.5 10.5l1.1 1.1M11.6 2.4l-1.1 1.1M3.5 10.5l-1.1 1.1" stroke={P.roseDark} strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-          </button>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={openProfile} style={{width:32,height:32,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke={P.roseDark} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 4l2 2" stroke={P.roseDark} strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button onClick={()=>setPage("guide")} style={{width:32,height:32,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="5.5" stroke={P.roseDark} strokeWidth="1.3"/>
+                <path d="M7 6.5v4" stroke={P.roseDark} strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="7" cy="4.5" r="0.8" fill={P.roseDark}/>
+              </svg>
+            </button>
+          </div>
         </div>
         <div style={{display:"flex",gap:6}}>
           {[{id:"cube",label:"📦 큐브 재고"},{id:"diet",label:"🗓 식단표"}].map(t=>(
@@ -426,6 +864,7 @@ export default function App(){
               <button key={v.id} onClick={()=>setDietView(v.id)} style={{padding:"5px 14px",borderRadius:20,border:"none",background:dietView===v.id?P.rose:P.rosePale,color:dietView===v.id?"#fff":P.roseDark,fontSize:12,fontWeight:700,cursor:"pointer"}}>{v.label}</button>
             ))}
           </div>
+          <CubeBanner cubeDays={cubeDays}/>
           {dietView==="week"&&(
             <div ref={scrollRef} style={{overflowY:"auto",flex:1,paddingTop:4}}>
               {allWeekStarts().map(ws=>{
@@ -434,7 +873,7 @@ export default function App(){
                   <div key={ws} ref={el=>{if(el)weekRefs.current[ws]=el;}}>
                     <div style={{display:"flex",alignItems:"center",padding:"12px 16px 6px",position:"sticky",top:0,background:P.bg,zIndex:5}}>
                       <div style={{fontSize:12,fontWeight:700,color:isCW?P.rose:P.textSub,background:isCW?"#FFF0EB":"transparent",padding:"3px 12px",borderRadius:20,border:isCW?`1.5px solid ${P.rose}`:`1.5px solid ${P.border}`}}>
-                        {isCW?"✨ 이번 주":`${dates[0].slice(5).replace("-","/")} ~ ${dates[6].slice(5).replace("-","/")} `}
+                        {isCW?"✨ 이번 주":`${dates[0].slice(5).replace("-","/")} ~ ${dates[6].slice(5).replace("-","/")}`}
                       </div>
                     </div>
                     {dates.map(d=>renderDayCard(d,false))}
@@ -464,11 +903,11 @@ export default function App(){
                     {totalGram(selDate)>0&&<span style={{fontSize:11,color:P.rose,fontWeight:700,background:"#FFF0EB",padding:"2px 8px",borderRadius:10}}>총 {totalGram(selDate)}g</span>}
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>openCubeDay(selDate)} style={{padding:"5px 10px",borderRadius:10,border:"1.5px solid #8B5CF6",background:"#F5F3FF",color:"#8B5CF6",fontSize:11,fontWeight:700,cursor:"pointer"}}>🧊 큐브</button>
+                    <button onClick={()=>openCubeDay(selDate)} style={{padding:"5px 10px",borderRadius:10,border:"none",background:"#FDF0D5",color:"#B07D2A",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ 큐브</button>
                     {dayMeals(selDate).length<3&&<button onClick={()=>openAddMeal(selDate)} style={{padding:"5px 10px",borderRadius:10,border:"none",background:P.rose,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ 끼니</button>}
                   </div>
                 </div>
-                {cdList(selDate).length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{cdList(selDate).map(n=><span key={n} style={{fontSize:11,background:"#F5F3FF",color:"#7C3AED",borderRadius:8,padding:"3px 10px",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>🧊 {n} 큐브 만드는 날<span onClick={()=>removeCD(selDate,n)} style={{cursor:"pointer",color:"#bbb",fontSize:12}}>×</span></span>)}</div>}
+                {cdList(selDate).length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>{cdList(selDate).map(n=><span key={n} style={{fontSize:11,background:"#FDF0D5",color:"#B07D2A",borderRadius:8,padding:"3px 10px",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>{n} 큐브 만드는 날<span onClick={()=>removeCD(selDate,n)} style={{cursor:"pointer",color:"#C4A090",fontSize:12}}>×</span></span>)}</div>}
                 {dayMeals(selDate).length===0&&cdList(selDate).length===0&&<div style={{textAlign:"center",padding:"20px 0",color:"#DDD0C8",fontSize:13}}>기록이 없어요</div>}
                 {dayMeals(selDate).map((meal,idx)=>{
                   const mg=meal.items.reduce((s,it)=>s+(Number(it.gram)||0),0);
@@ -514,7 +953,8 @@ export default function App(){
                 {filtered.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:P.textSub}}><div style={{fontSize:32}}>📭</div><div style={{fontSize:13,marginTop:6}}>등록된 재고가 없어요</div></div>}
                 {filtered.map(item=>{
                   const cat=getCat(item.category),isLow=item.count<=LOW_STOCK;
-                  const exp=addDays(item.made,VALIDITY_DAYS),expired=isExpired(item.made),soon=isExpiringSoon(item.made);
+                  const exp=item.expiry||addDays(item.made,VALIDITY_DAYS);
+                  const expired=exp<todayStr(),soon=!expired&&exp<=addDays(todayStr(),3);
                   return(
                     <div key={item.id} style={{background:P.surface,borderRadius:16,padding:"14px 16px",boxShadow:"0 1px 6px rgba(196,112,80,0.07)",border:expired?`2px solid #E53935`:isLow?`2px solid #FFB347`:`1px solid ${P.border}`}}>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -563,7 +1003,7 @@ export default function App(){
                     <div style={{fontSize:11,color:"#A05000",marginTop:3}}>빠른 시일 내에 큐브를 만들어주세요!</div>
                   </div>
                   {lowCubes.map(item=>{
-                    const cat=getCat(item.category);
+                    const cat=getCat(item.category),exp2=item.expiry||addDays(item.made,VALIDITY_DAYS);
                     return(
                       <div key={item.id} style={{background:P.surface,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"2px solid #FFB347",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -585,7 +1025,6 @@ export default function App(){
         </div>
       )}
 
-      {/* FAB */}
       {mainTab==="cube"&&cubeTab==="stock"&&(
         <button onClick={openAddCube} style={{position:"fixed",bottom:24,right:24,width:54,height:54,borderRadius:"50%",background:P.rose,border:"none",color:"#fff",fontSize:24,cursor:"pointer",boxShadow:"0 4px 16px rgba(232,165,152,0.5)",zIndex:100}}>+</button>
       )}
@@ -596,14 +1035,13 @@ export default function App(){
 }
 
 const sBtn=(bg,color)=>({padding:"6px 10px",borderRadius:10,border:"none",background:bg,fontSize:11,color,cursor:"pointer",fontWeight:600,flexShrink:0});
-const navBtn={width:34,height:34,borderRadius:10,border:`1px solid #F0E6DC`,background:"#fff",color:"#C08070",fontSize:18,fontWeight:700,cursor:"pointer"};
+const navBtn={width:34,height:34,borderRadius:10,border:"1px solid #F0E6DC",background:"#fff",color:"#C08070",fontSize:18,fontWeight:700,cursor:"pointer"};
 const inputSt={padding:"12px 14px",borderRadius:12,border:"1.5px solid #F0E6DC",fontSize:16,outline:"none",display:"block",fontFamily:"inherit",width:"100%",boxSizing:"border-box"};
 const labelSt={fontSize:12,fontWeight:700,color:"#C08070",display:"block",marginBottom:6};
 const saveSt={width:"100%",padding:"16px",borderRadius:14,border:"none",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"};
 const fontImport=`
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap');
   * { box-sizing: border-box; }
-  /* iOS 자동 zoom 방지 */
   input, select, textarea { font-size: 16px !important; }
   input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   ::-webkit-scrollbar { display: none; }
