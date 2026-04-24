@@ -256,7 +256,7 @@ export default function App(){
   // 프로필 설정 페이지
   if(page==="profile") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
-      <FullPage title="아기 프로필 설정" onClose={()=>babyName?setPage("main"):null}>
+      <FullPage title="아기 프로필 설정" onClose={()=>setPage("main")}>
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,marginBottom:28}}>
           <div onClick={()=>photoInputRef.current?.click()} style={{width:90,height:90,borderRadius:"50%",overflow:"hidden",border:`3px solid ${P.rose}`,cursor:"pointer",background:P.rosePale,display:"flex",alignItems:"center",justifyContent:"center"}}>
             {profileDraft.photo?<img src={profileDraft.photo} alt="미리보기" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<BabyIllust size={90}/>}
@@ -284,14 +284,14 @@ export default function App(){
                   value={it.name}
                   onChange={e=>updateMI(i,"name",e.target.value)}
                   onFocus={()=>{ setActiveII(i); setSugg(cubes.map(c=>c.name)); }}
-                  onBlur={()=>setSugg([])}
+                  onBlur={()=>setTimeout(()=>setSugg([]),150)}
                   placeholder="재료명"
                   style={{...inputSt,width:"100%"}}
                 />
                 {activeII===i&&sugg.length>0&&(
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:180,overflowY:"auto"}}>
                     {sugg.map(n=>(
-                      <div key={n} onPointerDown={e=>{ e.preventDefault(); pickSugg(n); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
+                      <div key={n} onMouseDown={()=>pickSugg(n)} onTouchEnd={e=>{ e.preventDefault(); pickSugg(n); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
                     ))}
                   </div>
                 )}
@@ -328,7 +328,7 @@ export default function App(){
               value={cdInput}
               onChange={e=>{ setCdInput(e.target.value); const q=e.target.value.toLowerCase(); setCdSugg(q?cubes.map(c=>c.name).filter(n=>n.toLowerCase().includes(q)):cubes.map(c=>c.name)); }}
               onFocus={()=>setCdSugg(cubes.map(c=>c.name))}
-              onBlur={()=>setCdSugg([])}
+              onBlur={()=>setTimeout(()=>setCdSugg([]),150)}
               placeholder="재료명 입력 또는 선택"
               style={{...inputSt,flex:1}}
               onKeyDown={e=>e.key==="Enter"&&addCD()}
@@ -338,7 +338,7 @@ export default function App(){
           {cdSugg.length>0&&(
             <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:"1.5px solid #8B5CF6",borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:200,overflowY:"auto"}}>
               {cdSugg.map(n=>(
-                <div key={n} onPointerDown={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>🧊 {n}</div>
+                <div key={n} onMouseDown={()=>{ setCdInput(n); setCdSugg([]); }} onTouchEnd={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>🧊 {n}</div>
               ))}
             </div>
           )}
