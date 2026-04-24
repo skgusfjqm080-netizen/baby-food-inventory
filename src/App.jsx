@@ -284,14 +284,14 @@ export default function App(){
                   value={it.name}
                   onChange={e=>updateMI(i,"name",e.target.value)}
                   onFocus={()=>{ setActiveII(i); setSugg(cubes.map(c=>c.name)); }}
-                  onBlur={()=>setTimeout(()=>setSugg([]),200)}
+                  onBlur={()=>setSugg([])}
                   placeholder="재료명"
                   style={{...inputSt,width:"100%"}}
                 />
                 {activeII===i&&sugg.length>0&&(
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:180,overflowY:"auto"}}>
                     {sugg.map(n=>(
-                      <div key={n} onMouseDown={()=>pickSugg(n)} onTouchStart={()=>pickSugg(n)} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
+                      <div key={n} onPointerDown={e=>{ e.preventDefault(); pickSugg(n); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
                     ))}
                   </div>
                 )}
@@ -328,7 +328,7 @@ export default function App(){
               value={cdInput}
               onChange={e=>{ setCdInput(e.target.value); const q=e.target.value.toLowerCase(); setCdSugg(q?cubes.map(c=>c.name).filter(n=>n.toLowerCase().includes(q)):cubes.map(c=>c.name)); }}
               onFocus={()=>setCdSugg(cubes.map(c=>c.name))}
-              onBlur={()=>setTimeout(()=>setCdSugg([]),200)}
+              onBlur={()=>setCdSugg([])}
               placeholder="재료명 입력 또는 선택"
               style={{...inputSt,flex:1}}
               onKeyDown={e=>e.key==="Enter"&&addCD()}
@@ -338,7 +338,7 @@ export default function App(){
           {cdSugg.length>0&&(
             <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:"1.5px solid #8B5CF6",borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:200,overflowY:"auto"}}>
               {cdSugg.map(n=>(
-                <div key={n} onMouseDown={()=>{setCdInput(n);setCdSugg([]);}} onTouchStart={()=>{setCdInput(n);setCdSugg([]);}} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>🧊 {n}</div>
+                <div key={n} onPointerDown={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>🧊 {n}</div>
               ))}
             </div>
           )}
@@ -597,12 +597,14 @@ export default function App(){
 
 const sBtn=(bg,color)=>({padding:"6px 10px",borderRadius:10,border:"none",background:bg,fontSize:11,color,cursor:"pointer",fontWeight:600,flexShrink:0});
 const navBtn={width:34,height:34,borderRadius:10,border:`1px solid #F0E6DC`,background:"#fff",color:"#C08070",fontSize:18,fontWeight:700,cursor:"pointer"};
-const inputSt={padding:"12px 14px",borderRadius:12,border:"1.5px solid #F0E6DC",fontSize:15,outline:"none",display:"block",fontFamily:"inherit",width:"100%",boxSizing:"border-box"};
+const inputSt={padding:"12px 14px",borderRadius:12,border:"1.5px solid #F0E6DC",fontSize:16,outline:"none",display:"block",fontFamily:"inherit",width:"100%",boxSizing:"border-box"};
 const labelSt={fontSize:12,fontWeight:700,color:"#C08070",display:"block",marginBottom:6};
 const saveSt={width:"100%",padding:"16px",borderRadius:14,border:"none",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"};
 const fontImport=`
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap');
   * { box-sizing: border-box; }
+  /* iOS 자동 zoom 방지 */
+  input, select, textarea { font-size: 16px !important; }
   input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   ::-webkit-scrollbar { display: none; }
 `;
