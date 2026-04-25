@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 
 const P = {
   bg:"#FAF6F2", surface:"#fff", border:"#F0E6DC",
@@ -323,10 +323,10 @@ function ImageCropper({ src, onDone, onCancel }) {
               }}
             >
               {[1,2].map(n=>(
-                <React.Fragment key={n}>
+                <Fragment key={n}>
                   <div style={{position:"absolute",left:`${n*33.3}%`,top:0,width:1,height:"100%",background:"rgba(255,255,255,0.25)"}}/>
                   <div style={{position:"absolute",top:`${n*33.3}%`,left:0,height:1,width:"100%",background:"rgba(255,255,255,0.25)"}}/>
-                </React.Fragment>
+                </Fragment>
               ))}
               <H type="nw" pos={{left:-11,top:-11}}/>
               <H type="ne" pos={{right:-11,top:-11}}/>
@@ -727,7 +727,7 @@ export default function App(){
             {profileDraft.photo?<img src={profileDraft.photo} alt="미리보기" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<BabyIllust size={90}/>}
           </div>
           <button onClick={()=>photoInputRef.current?.click()} style={{fontSize:13,padding:"6px 18px",borderRadius:10,border:`1px solid ${P.border}`,background:P.surface,color:P.roseDark,cursor:"pointer"}}>📷 사진 선택</button>
-          <input ref={photoInputRef} type="file" accept="image/*" onChange={e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setCropSrc(ev.target.result); r.readAsDataURL(f); }} style={{display:"none"}}/>
+          <input ref={photoInputRef} type="file" accept="image/*" onChange={e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{ setCropSrc(ev.target.result); e.target.value=''; }; r.readAsDataURL(f); }} style={{display:"none"}}/>
         </div>
         <label style={labelSt}>아기 이름</label>
         <input value={profileDraft.name} onChange={e=>setProfileDraft(d=>({...d,name:e.target.value}))} placeholder="예: 지우, 민준" style={{...inputSt,width:"100%",marginBottom:24}}/>
