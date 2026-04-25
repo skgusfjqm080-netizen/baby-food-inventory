@@ -748,7 +748,9 @@ export default function App(){
                 {activeII===i&&sugg.length>0&&(
                   <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:`1.5px solid ${P.rose}`,borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:180,overflowY:"auto"}}>
                     {sugg.map(n=>(
-                      <div key={n} onMouseDown={()=>pickSugg(n)} onTouchEnd={e=>{ e.preventDefault(); pickSugg(n); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
+                      <div key={n} onMouseDown={()=>pickSugg(n)}
+                      onTouchStart={e=>{ e.currentTarget._tx=e.touches[0].clientY; }}
+                      onTouchEnd={e=>{ const dy=Math.abs(e.changedTouches[0].clientY-(e.currentTarget._tx||0)); if(dy<8){ e.preventDefault(); pickSugg(n); } }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
                     ))}
                   </div>
                 )}
@@ -785,7 +787,9 @@ export default function App(){
           {cdSugg.length>0&&(
             <div style={{position:"absolute",top:"100%",left:0,right:0,background:P.surface,border:"1.5px solid #D4A843",borderRadius:12,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",maxHeight:200,overflowY:"auto"}}>
               {cdSugg.map(n=>(
-                <div key={n} onMouseDown={()=>{ setCdInput(n); setCdSugg([]); }} onTouchEnd={e=>{ e.preventDefault(); setCdInput(n); setCdSugg([]); }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
+                <div key={n} onMouseDown={()=>{ setCdInput(n); setCdSugg([]); }}
+                  onTouchStart={e=>{ e.currentTarget._tx=e.touches[0].clientY; }}
+                  onTouchEnd={e=>{ const dy=Math.abs(e.changedTouches[0].clientY-(e.currentTarget._tx||0)); if(dy<8){ e.preventDefault(); setCdInput(n); setCdSugg([]); } }} style={{padding:"12px 16px",fontSize:14,color:P.text,cursor:"pointer",borderBottom:`1px solid ${P.bg}`}}>{n}</div>
               ))}
             </div>
           )}
