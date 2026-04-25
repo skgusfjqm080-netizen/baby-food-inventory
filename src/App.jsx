@@ -21,7 +21,6 @@ const DAYS_KO=["일","월","화","수","목","금","토"];
 
 const pad = n => String(n).padStart(2,"0");
 const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-// ★ 문자열 날짜를 로컬 타임존으로 파싱 (UTC 파싱 시 한국에서 날짜 하루 밀림 방지)
 const parseLocal = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
 const addDays = (s,n) => { const d=parseLocal(s); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const isExpired = m => addDays(m,VALIDITY_DAYS)<todayStr();
@@ -44,6 +43,111 @@ const DEFAULT_CUBES=[
   {id:5,name:"사과",   category:"fruit", count:2, made:addDays(TODAY,-4),note:""},
 ];
 
+// ── 이유식 가이드 데이터 ─────────────────────────────
+const GUIDE = [
+  {
+    month:6, stage:"초기", tag:"이유식 시작!", color:"#74C69D", bg:"#E8F5EE",
+    totalRange:"30~80g", grainRange:"30~50g", meatRange:"10g (+~10g)", vegRange:"10~20g", meals:1,
+    memo:[
+      "만 6개월(180일)부터 시작",
+      "입으로 먹는 연습 + 알러지 테스트",
+      "아기가 안 먹고 흘려도 스트레스 받지 마세요 😊",
+      "4일차부터는 쌀미음과 소고기를 기본으로",
+      "테스트 한 음식은 추가 반찬으로 주기",
+      "야채는 정해진 날짜 없이 3일 간격으로만 바꿔가며 테스트",
+    ],
+    grains:["쌀미음"],
+    meats:["소고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","밤"],
+    fruits:[],
+    fish:[],
+    etc:[],
+  },
+  {
+    month:7, stage:"중기", tag:"2끼 시작", color:"#F59E0B", bg:"#FFFBEB",
+    totalRange:"80~120g", grainRange:"40~60g", meatRange:"10g (+~10g)", vegRange:"30~40g", meals:2,
+    memo:[
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "밀가루·계란·땅콩 소량씩 테스트",
+      "중기 이유식의 목표는 입으로 잡자 연습 및 닭고기 시작",
+      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
+      "너무 복잡할 경우 죽 OR 밥솥 이유식으로 변경",
+    ],
+    grains:["쌀현미","쌀오트","쌀흑미"],
+    meats:["닭고기","소고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","밤","양배추","비트","파프리카"],
+    fruits:["사과","배","바나나"],
+    fish:["연어","흰살생선"],
+    etc:["두부"],
+  },
+  {
+    month:8, stage:"중기", tag:"", color:"#F59E0B", bg:"#FFFBEB",
+    totalRange:"80~120g", grainRange:"40~60g", meatRange:"10g (+~10g)", vegRange:"30~40g", meals:2,
+    memo:[
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
+      "쌀과 오트밀 1:1비율로 만든 죽을 베이스로 사용",
+      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
+      "입자가 좀 더 굵어진다 → 밥태기가 올 수 있음",
+    ],
+    grains:["쌀오트","쌀흑미","쌀현미"],
+    meats:["닭고기","소고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","양배추","비트","파프리카","감자","무"],
+    fruits:["사과","배","바나나","복숭아"],
+    fish:["새우","흰살생선"],
+    etc:["계란","두부"],
+  },
+  {
+    month:9, stage:"후기", tag:"3끼 시작", color:"#E8A598", bg:"#FFF0EB",
+    totalRange:"120~180g", grainRange:"60~100g", meatRange:"10~15g (+~10g)", vegRange:"40~60g", meals:3,
+    memo:[
+      "1끼 → 2끼 → 3끼, 반찬 2가지씩",
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+    ],
+    grains:["쌀현미","쌀오트","쌀보리"],
+    meats:["소고기","닭고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","양배추","감자","무","연근","우엉","버섯"],
+    fruits:["사과","배","바나나","복숭아","블루베리"],
+    fish:["흰살생선","연어"],
+    etc:["계란","두부","치즈"],
+  },
+  {
+    month:10, stage:"후기", tag:"", color:"#E8A598", bg:"#FFF0EB",
+    totalRange:"120~180g", grainRange:"60~100g", meatRange:"10~15g (+~10g)", vegRange:"40~60g", meals:3,
+    memo:[
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능",
+    ],
+    grains:["쌀오트","쌀흑미","쌀보리"],
+    meats:["소고기","닭고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","양배추","감자","무","연근","우엉","버섯","아보카도"],
+    fruits:["사과","배","바나나","복숭아","블루베리","딸기"],
+    fish:["새우","오징어","흰살생선"],
+    etc:["계란","두부","치즈"],
+  },
+  {
+    month:11, stage:"후기", tag:"", color:"#E8A598", bg:"#FFF0EB",
+    totalRange:"120~180g", grainRange:"60~100g", meatRange:"10~15g (+~10g)", vegRange:"40~60g", meals:3,
+    memo:[
+      "밀가루·계란·땅콩 소량씩 테스트하기",
+      "1끼 → 2끼, 반찬 2가지씩 주기",
+      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
+      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
+      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
+      "입자가 좀 더 굵어진다 → 밥태기가 올 수 있음",
+    ],
+    grains:["쌀현미","쌀오트","쌀보리"],
+    meats:["소고기","닭고기"],
+    veggies:["브로콜리","단호박","애호박","청경채","시금치","당근","고구마","양배추","감자","무","연근","우엉","버섯","아보카도","파프리카","비트"],
+    fruits:["사과","배","바나나","복숭아","블루베리","딸기","키위"],
+    fish:["새우","잔멸치","오징어","흰살생선"],
+    etc:["계란","두부","치즈"],
+  },
+];
 
 // ── 이미지 크롭 헬퍼 ──────────────────────────────
 function getCroppedImg(imageSrc, crop) {
@@ -59,6 +163,8 @@ function getCroppedImg(imageSrc, crop) {
   });
 }
 
+// ── 크롭 UI ─────────────────────────────────────
+// iOS 모바일: position:fixed+inset:0 대신 position:absolute로 처리
 function ImageCropper({ src, onDone, onCancel }) {
   const [ratioMode, setRatioMode] = useState("1:1");
   const [box, setBox] = useState(null);
@@ -163,28 +269,59 @@ function ImageCropper({ src, onDone, onCancel }) {
               cursor:"pointer",zIndex:20,...pos}}/>
   );
 
+  // iOS Safari 에서 position:fixed 가 키보드/스크롤과 충돌하는 문제 방지
+  // → 대신 전체 페이지를 교체하는 방식으로 렌더
   return (
-    <div style={{position:"fixed",inset:0,background:"#000",zIndex:400,
-                 display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-      <div style={{position:"relative",width:"92vw",maxWidth:440,
-                   display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <img ref={imgRef} src={src} onLoad={onImgLoad} draggable={false}
-          style={{display:"block",width:"100%",maxHeight:"58vh",objectFit:"contain",
-                  userSelect:"none",pointerEvents:"none"}}/>
-        {box&&(
+    <div style={{
+      position:"fixed", top:0, left:0, right:0, bottom:0,
+      width:"100%", height:"100%",
+      background:"#111",
+      zIndex:9999,
+      display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"center",
+      overflowY:"hidden",
+      WebkitOverflowScrolling:"touch",
+    }}>
+      {/* 이미지 + 오버레이 */}
+      <div style={{
+        position:"relative",
+        width:"92vw", maxWidth:440,
+        display:"flex", alignItems:"center", justifyContent:"center",
+      }}>
+        <img
+          ref={imgRef} src={src} onLoad={onImgLoad} draggable={false}
+          style={{
+            display:"block", width:"100%",
+            maxHeight:"55vh", objectFit:"contain",
+            userSelect:"none", pointerEvents:"none",
+            WebkitUserSelect:"none",
+          }}
+        />
+        {box && (
           <>
+            {/* SVG 마스크 오버레이 */}
             <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
               <svg width="100%" height="100%" style={{position:"absolute",inset:0}}>
-                <defs><mask id="cm">
-                  <rect width="100%" height="100%" fill="white"/>
-                  <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="black"/>
-                </mask></defs>
-                <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#cm)"/>
+                <defs>
+                  <mask id="cropmask">
+                    <rect width="100%" height="100%" fill="white"/>
+                    <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="black"/>
+                  </mask>
+                </defs>
+                <rect width="100%" height="100%" fill="rgba(0,0,0,0.65)" mask="url(#cropmask)"/>
               </svg>
             </div>
-            <div onPointerDown={e=>startDrag(e,"move")} onTouchStart={e=>startDrag(e,"move")}
-              style={{position:"absolute",left:box.x,top:box.y,width:box.w,height:box.h,
-                      border:"2px solid #E8A598",cursor:"move",touchAction:"none",boxSizing:"border-box"}}>
+            {/* 크롭 박스 */}
+            <div
+              onPointerDown={e=>startDrag(e,"move")}
+              onTouchStart={e=>startDrag(e,"move")}
+              style={{
+                position:"absolute",
+                left:box.x, top:box.y, width:box.w, height:box.h,
+                border:"2px solid #E8A598",
+                cursor:"move", touchAction:"none", boxSizing:"border-box",
+              }}
+            >
               {[1,2].map(n=>(
                 <React.Fragment key={n}>
                   <div style={{position:"absolute",left:`${n*33.3}%`,top:0,width:1,height:"100%",background:"rgba(255,255,255,0.25)"}}/>
@@ -199,21 +336,30 @@ function ImageCropper({ src, onDone, onCancel }) {
           </>
         )}
       </div>
-      <div style={{marginTop:20,display:"flex",flexDirection:"column",alignItems:"center",gap:14,width:"92vw",maxWidth:440}}>
+
+      {/* 하단 컨트롤 */}
+      <div style={{
+        marginTop:20, display:"flex", flexDirection:"column",
+        alignItems:"center", gap:14, width:"92vw", maxWidth:440,
+      }}>
         <div style={{display:"flex",gap:8}}>
           {[{v:"1:1",label:"1 : 1"},{v:"free",label:"자유 비율"}].map(({v,label})=>(
             <button key={v} onClick={()=>toggleRatio(v)}
-              style={{padding:"8px 20px",borderRadius:20,border:"none",
-                      background:ratioMode===v?"#E8A598":"rgba(255,255,255,0.15)",
-                      color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              style={{
+                padding:"8px 22px", borderRadius:20, border:"none",
+                background: ratioMode===v ? "#E8A598" : "rgba(255,255,255,0.18)",
+                color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer",
+              }}>
               {label}
             </button>
           ))}
         </div>
         <div style={{display:"flex",gap:10,width:"100%"}}>
           <button onClick={onCancel}
-            style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid rgba(255,255,255,0.3)",
-                    background:"transparent",color:"rgba(255,255,255,0.8)",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            style={{flex:1,padding:"14px",borderRadius:14,
+                    border:"1px solid rgba(255,255,255,0.3)",
+                    background:"transparent",color:"rgba(255,255,255,0.85)",
+                    fontSize:14,fontWeight:700,cursor:"pointer"}}>
             취소
           </button>
           <button onClick={handleDone}
@@ -226,131 +372,6 @@ function ImageCropper({ src, onDone, onCancel }) {
     </div>
   );
 }
-
-
-// ── 이유식 가이드 데이터 ─────────────────────────────
-const GUIDE = [
-  {
-    month: 6,
-    stage: "초기",
-    tag: "이유식 시작!",
-    color: "#74C69D",
-    bg: "#E8F5EE",
-    totalRange: "30~80g",
-    grainRange: "30~50g",
-    meatRange: "10g (+~10g)",
-    vegRange: "10~20g",
-    meals: 1,
-    memo: [
-      "만 6개월(180일)부터 시작",
-      "입으로 먹는 연습 + 알러지 테스트",
-      "아기가 안 먹고 흘려도 스트레스 받지 마세요 😊",
-      "4일차부터는 쌀미음과 소고기를 기본으로",
-      "테스트 한 음식은 추가 반찬으로 주기",
-      "야채는 정해진 날짜 없이 3일 간격으로만 바꿔가며 테스트",
-    ],
-    foods: ["쌀미음","소고기","브로콜리","단호박","애호박","청경채","시금치","당근","고구마","밤 등"],
-  },
-  {
-    month: 7,
-    stage: "중기",
-    tag: "2끼 시작",
-    color: "#F59E0B",
-    bg: "#FFFBEB",
-    totalRange: "80~120g",
-    grainRange: "40~60g",
-    meatRange: "10g (+~10g)",
-    vegRange: "30~40g",
-    meals: 2,
-    memo: [
-      "1끼 → 2끼, 반찬 2가지씩 주기",
-      "밀가루·계란·땅콩 소량씩 테스트",
-      "중기 이유식의 목표는 입으로 잡자 연습 및 닭고기 시작",
-      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
-      "너무 복잡할 경우 죽 OR 밥솥 이유식으로 변경",
-    ],
-    foods: ["쌀현미","쌀오트","쌀흑미","닭고기","소고기","연어","흰살생선","두부","다양한 채소"],
-  },
-  {
-    month: 8,
-    stage: "중기",
-    tag: "",
-    color: "#F59E0B",
-    bg: "#FFFBEB",
-    totalRange: "80~120g",
-    grainRange: "40~60g",
-    meatRange: "10g (+~10g)",
-    vegRange: "30~40g",
-    meals: 2,
-    memo: [
-      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
-      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
-      "저는 쌀과 오트밀 1:1비율로 만든 죽을 베이스로 사용",
-      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
-      "입자가 좀 더 굵어진다 → 농도·입자감이 바뀌어서 밥태기가 올 수 있음",
-    ],
-    foods: ["쌀오트","쌀흑미","쌀현미","닭고기","새우","흰살생선","계란","다양한 채소"],
-  },
-  {
-    month: 9,
-    stage: "후기",
-    tag: "",
-    color: "#E8A598",
-    bg: "#FFF0EB",
-    totalRange: "120~180g",
-    grainRange: "60~100g",
-    meatRange: "10~15g (+~10g)",
-    vegRange: "40~60g",
-    meals: 3,
-    memo: [
-      "1끼 → 2끼 → 3끼, 반찬 2가지씩",
-      "밀가루·계란·땅콩 소량씩 테스트하기",
-      "중기부터는 테스트 끝난 토핑 단독으로 OR 큐브 결합으로 진행",
-      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
-    ],
-    foods: ["쌀현미","쌀오트","쌀보리","소고기","닭고기","두부","계란","다양한 채소"],
-  },
-  {
-    month: 10,
-    stage: "후기",
-    tag: "",
-    color: "#E8A598",
-    bg: "#FFF0EB",
-    totalRange: "120~180g",
-    grainRange: "60~100g",
-    meatRange: "10~15g (+~10g)",
-    vegRange: "40~60g",
-    meals: 3,
-    memo: [
-      "밀가루·계란·땅콩 소량씩 테스트하기",
-      "1끼 → 2끼, 반찬 2가지씩 주기",
-      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
-      "잡곡 테스트 후 추가 가능",
-    ],
-    foods: ["쌀오트","쌀흑미","쌀보리","소고기","닭고기","새우","오징어","다양한 채소"],
-  },
-  {
-    month: 11,
-    stage: "후기",
-    tag: "",
-    color: "#E8A598",
-    bg: "#FFF0EB",
-    totalRange: "120~180g",
-    grainRange: "60~100g",
-    meatRange: "10~15g (+~10g)",
-    vegRange: "40~60g",
-    meals: 3,
-    memo: [
-      "밀가루·계란·땅콩 소량씩 테스트하기",
-      "1끼 → 2끼, 반찬 2가지씩 주기",
-      "한 번 만들 때 큐브를 넉넉히 만들어 반찬을 바꿔준다",
-      "잡곡 테스트 후 추가 가능(현미, 흑미, 퀴노아 등)",
-      "물만 사용했던 이유식에서 육수사용, 닭고기 추가",
-      "입자가 좀 더 굵어진다 → 밥태기가 올 수 있음",
-    ],
-    foods: ["쌀현미","쌀오트","쌀보리","소고기","닭고기","새우","잔멸치","오징어","다양한 채소"],
-  },
-];
 
 const BabyIllust=({size=56})=>(
   <svg viewBox="0 0 56 56" width={size} height={size}>
@@ -384,7 +405,6 @@ function FullPage({title,subtitle,onClose,children}){
   );
 }
 
-// ── 큐브 알림 배너 ──────────────────────────────────
 function CubeBanner({ cubeDays }){
   const today=todayStr(), tomorrow=addDays(today,1);
   const todayList=cubeDays[today]||[], tomorrowList=cubeDays[tomorrow]||[];
@@ -425,10 +445,10 @@ export default function App(){
   const [cubeTab,setCubeTab]=useState("stock");
   const [dietView,setDietView]=useState("week");
   const [filterCat,setFilterCat]=useState("all");
-  const [selMonth,setSelMonth]=useState(6); // 가이드 페이지 선택 개월수
+  const [selMonth,setSelMonth]=useState(6);
 
   const [profileDraft,setProfileDraft]=useState({name:"",photo:""});
-  const [cropSrc,setCropSrc]=useState(null); // 크롭 대기 중인 원본 이미지
+  const [cropSrc,setCropSrc]=useState(null);
   const photoInputRef=useRef(null);
   useEffect(()=>{ if(!babyName){ setProfileDraft({name:"",photo:""}); setPage("profile"); } },[]);
 
@@ -448,15 +468,12 @@ export default function App(){
   const [editCube,setEditCube]=useState(null);
   const [cubeForm,setCubeForm]=useState({name:"",category:"veggie",count:0,made:TODAY,note:""});
 
-  // ── 주간 스크롤 ──────────────────────────────────
   const today=todayStr();
   const todayWS=weekStart(today);
-
   const scrollRef=useRef(null);
   const weekRefs=useRef({});
   const allWeekStarts=useCallback(()=>Array.from({length:13},(_,i)=>addDays(todayWS,(i-8)*7)),[todayWS]);
 
-  // 식단표 탭 진입 or 주간뷰 전환 시 오늘 주로 이동 (instant, 애니메이션 없음)
   const prevMainTab=useRef(mainTab);
   const prevDietView=useRef(dietView);
   const scrollToWS=(ws,behavior="instant")=>{
@@ -477,7 +494,7 @@ export default function App(){
   const [calYear,setCalYear]=useState(nowD.getFullYear());
   const [calMonth,setCalMonth]=useState(nowD.getMonth());
   const [selDate,setSelDate]=useState(today);
-  const firstDay=new Date(calYear,calMonth,1).getDay(); // 이미 로컬 파싱
+  const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
   const prevMonth=()=>{ if(calMonth===0){setCalYear(y=>y-1);setCalMonth(11);}else setCalMonth(m=>m-1); };
   const nextMonth=()=>{ if(calMonth===11){setCalYear(y=>y+1);setCalMonth(0);}else setCalMonth(m=>m+1); };
@@ -487,7 +504,6 @@ export default function App(){
   const filtered=filterCat==="all"?cubes:cubes.filter(c=>c.category===filterCat);
   const lowCubes=cubes.filter(c=>c.count<=LOW_STOCK);
 
-  // ── 페이지 오픈 헬퍼 ──
   const openProfile=()=>{ setProfileDraft({name:babyName,photo:babyPhoto}); setPage("profile"); };
   const openAddMeal=d=>{ setMealDate(d); setEditMealIdx(null); setMealForm({items:[{name:"",gram:""}]}); setSugg([]); setActiveII(null); setPage("meal"); };
   const openEditMeal=(d,i)=>{ setMealDate(d); setEditMealIdx(i); setMealForm({items:[...dayMeals(d)[i].items.map(x=>({...x}))]}); setSugg([]); setActiveII(null); setPage("meal"); };
@@ -496,10 +512,7 @@ export default function App(){
   const openEditCube=c=>{ setEditCube(c); setCubeForm({name:c.name,category:c.category,count:c.count,made:c.made,expiry:c.expiry||addDays(c.made,VALIDITY_DAYS),note:c.note}); setPage("cubeform"); };
 
   const goBackToMain=(dateStr)=>{
-    if(dateStr){
-      // 저장한 날짜 주로 instant 이동 (page가 main으로 바뀐 후 실행)
-      setTimeout(()=>scrollToWS(weekStart(dateStr)),50);
-    }
+    if(dateStr) setTimeout(()=>scrollToWS(weekStart(dateStr)),50);
     setPage("main");
   };
 
@@ -533,9 +546,6 @@ export default function App(){
   const deleteCube=id=>setCubes(cs=>cs.filter(c=>c.id!==id));
   const changeCount=(id,delta)=>setCubes(cs=>cs.map(c=>c.id===id?{...c,count:Math.max(0,c.count+delta)}:c));
 
-
-
-  // ── 날짜 카드 ──
   const renderDayCard=(dateStr,compact=false)=>{
     const dm=dayMeals(dateStr),cdl=cdList(dateStr),gram=totalGram(dateStr);
     const isToday=dateStr===today,dow=parseLocal(dateStr).getDay(),dayNum=Number(dateStr.slice(8));
@@ -606,96 +616,107 @@ export default function App(){
     );
   };
 
-  // ── 전체화면 페이지들 ──
+  // ── 가이드 페이지 ──
+  if(page==="guide"){
+    const g=GUIDE.find(x=>x.month===selMonth)||GUIDE[0];
+    const foodSections=[
+      {label:"🌾 곡물",items:g.grains,color:"#F59E0B",bg:"#FFFBEB"},
+      {label:"🥩 고기",items:g.meats,color:"#E53935",bg:"#FFEBEE"},
+      {label:"🥕 채소",items:g.veggies,color:"#4CAF50",bg:"#E8F5E9"},
+      {label:"🍎 과일",items:g.fruits,color:"#EC4899",bg:"#FDF2F8"},
+      {label:"🐟 해산물",items:g.fish,color:"#3B82F6",bg:"#EFF6FF"},
+      {label:"🍳 기타",items:g.etc,color:"#8B5CF6",bg:"#F5F3FF"},
+    ].filter(s=>s.items.length>0);
 
-  // ── 가이드 페이지 ─────────────────────────────────
-  if(page==="guide") return(
-    <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
-      <div style={{position:"sticky",top:0,background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,zIndex:10}}>
-        <button onClick={()=>setPage("main")} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M1 1l12 12M13 1L1 13" stroke={P.roseDark} strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-        </button>
-        <div style={{fontSize:16,fontWeight:800,color:P.text}}>📋 개월수별 이유식 가이드</div>
-      </div>
-      <div style={{padding:"16px 16px 80px"}}>
-        {(()=>{
-          const g=GUIDE.find(x=>x.month===selMonth)||GUIDE[0];
-          return(
-            <>
-              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,scrollbarWidth:"none",marginBottom:16}}>
-                {GUIDE.map(x=>(
-                  <button key={x.month} onClick={()=>setSelMonth(x.month)}
-                    style={{flexShrink:0,padding:"6px 14px",borderRadius:20,border:"none",
-                            background:selMonth===x.month?x.color:"#F0EBE7",
-                            color:selMonth===x.month?"#fff":P.textSub,
-                            fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                    {x.month}개월
-                  </button>
-                ))}
-              </div>
+    return(
+      <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+        <div style={{position:"sticky",top:0,background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,zIndex:10}}>
+          <button onClick={()=>setPage("main")} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${P.border}`,background:P.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke={P.roseDark} strokeWidth="1.8" strokeLinecap="round"/></svg>
+          </button>
+          <div style={{fontSize:16,fontWeight:800,color:P.text}}>📋 개월수별 이유식 가이드</div>
+        </div>
+        <div style={{padding:"16px 16px 80px"}}>
+          {/* 개월수 탭 */}
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,scrollbarWidth:"none",marginBottom:16}}>
+            {GUIDE.map(x=>(
+              <button key={x.month} onClick={()=>setSelMonth(x.month)}
+                style={{flexShrink:0,padding:"6px 14px",borderRadius:20,border:"none",
+                        background:selMonth===x.month?x.color:"#F0EBE7",
+                        color:selMonth===x.month?"#fff":P.textSub,
+                        fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                {x.month}개월
+              </button>
+            ))}
+          </div>
 
-              {/* 단계 뱃지 */}
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                <span style={{fontSize:20,fontWeight:900,color:P.text}}>{g.month}개월</span>
-                <span style={{padding:"3px 12px",borderRadius:20,background:g.color,color:"#fff",fontSize:12,fontWeight:700}}>{g.stage}</span>
-                {g.tag&&<span style={{padding:"3px 10px",borderRadius:20,background:g.bg,color:g.color,fontSize:12,fontWeight:700,border:`1px solid ${g.color}`}}>{g.tag}</span>}
-              </div>
+          {/* 단계 뱃지 */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <span style={{fontSize:20,fontWeight:900,color:P.text}}>{g.month}개월</span>
+            <span style={{padding:"3px 12px",borderRadius:20,background:g.color,color:"#fff",fontSize:12,fontWeight:700}}>{g.stage}</span>
+            {g.tag&&<span style={{padding:"3px 10px",borderRadius:20,background:g.bg,color:g.color,fontSize:12,fontWeight:700,border:`1px solid ${g.color}`}}>{g.tag}</span>}
+          </div>
 
-              {/* 권장량 카드 */}
-              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
-                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>📊 1끼 권장량</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {[
-                    {label:"1끼 총량",val:g.totalRange,emoji:"🍱"},
-                    {label:"하루 끼니",val:`${g.meals}끼`,emoji:"🕐"},
-                    {label:"곡물",val:g.grainRange,emoji:"🌾"},
-                    {label:"고기",val:g.meatRange,emoji:"🥩"},
-                    {label:"야채",val:g.vegRange,emoji:"🥕"},
-                  ].map(({label,val,emoji})=>(
-                    <div key={label} style={{background:g.bg,borderRadius:12,padding:"10px 12px"}}>
-                      <div style={{fontSize:11,color:P.textSub,marginBottom:2}}>{emoji} {label}</div>
-                      <div style={{fontSize:14,fontWeight:800,color:g.color}}>{val}</div>
-                    </div>
-                  ))}
+          {/* 권장량 */}
+          <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
+            <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>📊 1끼 권장량</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[
+                {label:"1끼 총량",val:g.totalRange,emoji:"🍱"},
+                {label:"하루 끼니",val:`${g.meals}끼`,emoji:"🕐"},
+                {label:"곡물",val:g.grainRange,emoji:"🌾"},
+                {label:"고기",val:g.meatRange,emoji:"🥩"},
+                {label:"야채",val:g.vegRange,emoji:"🥕"},
+              ].map(({label,val,emoji})=>(
+                <div key={label} style={{background:g.bg,borderRadius:12,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:P.textSub,marginBottom:2}}>{emoji} {label}</div>
+                  <div style={{fontSize:14,fontWeight:800,color:g.color}}>{val}</div>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              {/* 추천 식재료 */}
-              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
-                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>🥗 이 시기 식재료</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {g.foods.map(f=>(
-                    <span key={f} style={{fontSize:12,background:g.bg,color:g.color,borderRadius:8,padding:"4px 10px",fontWeight:600}}>{f}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* 메모 */}
-              <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${P.border}`}}>
-                <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>💡 이 시기 포인트</div>
-                {g.memo.map((m,i)=>(
-                  <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"flex-start"}}>
-                    <span style={{fontSize:12,color:g.color,fontWeight:700,flexShrink:0,marginTop:1}}>✓</span>
-                    <span style={{fontSize:12,color:P.text,lineHeight:1.6}}>{m}</span>
+          {/* 식재료 카테고리별 */}
+          <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${P.border}`}}>
+            <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:12}}>🥗 이 시기 식재료</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {foodSections.map(({label,items,color,bg})=>(
+                <div key={label}>
+                  <div style={{fontSize:11,fontWeight:700,color,marginBottom:6}}>{label}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {items.map(f=>(
+                      <span key={f} style={{fontSize:12,background:bg,color,borderRadius:8,padding:"4px 10px",fontWeight:600}}>{f}</span>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </>
-          );
-        })()}
-      </div>
-      <style>{fontImport}</style>
-    </div>
-  );
+                </div>
+              ))}
+            </div>
+          </div>
 
+          {/* 포인트 */}
+          <div style={{background:P.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${P.border}`}}>
+            <div style={{fontSize:12,fontWeight:800,color:P.text,marginBottom:10}}>💡 이 시기 포인트</div>
+            {g.memo.map((m,i)=>(
+              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"flex-start"}}>
+                <span style={{fontSize:12,color:g.color,fontWeight:700,flexShrink:0,marginTop:1}}>✓</span>
+                <span style={{fontSize:12,color:P.text,lineHeight:1.6}}>{m}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <style>{fontImport}</style>
+      </div>
+    );
+  }
+
+  // 크롭 화면: 다른 페이지 위에 렌더 (zIndex:9999)
+  // profile 페이지일 때만 표시
   if(page==="profile") return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto"}}>
+      {/* 크롭 UI — 최상단 레이어 */}
       {cropSrc&&(
         <ImageCropper
           src={cropSrc}
-          aspectRatio={1}
           onDone={cropped=>{ setProfileDraft(d=>({...d,photo:cropped})); setCropSrc(null); }}
           onCancel={()=>{ setCropSrc(null); if(photoInputRef.current) photoInputRef.current.value=""; }}
         />
@@ -751,8 +772,7 @@ export default function App(){
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             {cdList(cdDate).map(n=>(
               <span key={n} style={{fontSize:13,background:"#FDF0D5",color:"#B07D2A",borderRadius:10,padding:"6px 14px",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
-                {n}
-                <span onClick={()=>removeCD(cdDate,n)} style={{cursor:"pointer",color:"#C4A090",fontSize:16}}>×</span>
+                {n}<span onClick={()=>removeCD(cdDate,n)} style={{cursor:"pointer",color:"#C4A090",fontSize:16}}>×</span>
               </span>
             ))}
           </div>
@@ -798,10 +818,7 @@ export default function App(){
           </div>
           <div style={{flex:1}}>
             <label style={labelSt}>제조일</label>
-            <input type="date" value={cubeForm.made} onChange={e=>{
-              const newMade=e.target.value;
-              setCubeForm(f=>({...f,made:newMade,expiry:addDays(newMade,VALIDITY_DAYS)}));
-            }} style={{...inputSt,width:"100%"}}/>
+            <input type="date" value={cubeForm.made} onChange={e=>{ const nm=e.target.value; setCubeForm(f=>({...f,made:nm,expiry:addDays(nm,VALIDITY_DAYS)})); }} style={{...inputSt,width:"100%"}}/>
           </div>
         </div>
         <label style={labelSt}>유효기간</label>
@@ -817,7 +834,6 @@ export default function App(){
     </div>
   );
 
-  // ── 메인 화면 ──
   return(
     <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:P.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
       <div style={{background:P.bg,borderBottom:`1px solid ${P.border}`,padding:"16px 16px 0"}}>
@@ -855,7 +871,6 @@ export default function App(){
         </div>
       </div>
 
-      {/* 식단표 */}
       {mainTab==="diet"&&(
         <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 155px)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"10px 16px 4px",gap:6}}>
@@ -933,7 +948,6 @@ export default function App(){
         </div>
       )}
 
-      {/* 큐브 재고 */}
       {mainTab==="cube"&&(
         <div>
           <div style={{display:"flex",background:P.surface,borderBottom:`1px solid ${P.border}`}}>
@@ -1003,7 +1017,7 @@ export default function App(){
                     <div style={{fontSize:11,color:"#A05000",marginTop:3}}>빠른 시일 내에 큐브를 만들어주세요!</div>
                   </div>
                   {lowCubes.map(item=>{
-                    const cat=getCat(item.category),exp2=item.expiry||addDays(item.made,VALIDITY_DAYS);
+                    const cat=getCat(item.category);
                     return(
                       <div key={item.id} style={{background:P.surface,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"2px solid #FFB347",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1028,7 +1042,6 @@ export default function App(){
       {mainTab==="cube"&&cubeTab==="stock"&&(
         <button onClick={openAddCube} style={{position:"fixed",bottom:24,right:24,width:54,height:54,borderRadius:"50%",background:P.rose,border:"none",color:"#fff",fontSize:24,cursor:"pointer",boxShadow:"0 4px 16px rgba(232,165,152,0.5)",zIndex:100}}>+</button>
       )}
-
       <style>{fontImport}</style>
     </div>
   );
